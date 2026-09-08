@@ -311,4 +311,70 @@ def get_doctor_analytics():
     cursor.close()
     db.close()
 
-    return doctors
+    return {'doctors': doctors}
+
+# ENDPOINT 5: Appointment list
+# URL: http://127.0.0.1:8000/appointments
+# Returns: all appointments with patient and doctor names
+@app.get('/appointments')
+def get_appointments():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute(
+        '''
+        SELECT
+            a.appointment_id,
+            p.full_name AS patient_name,
+            d.full_name AS doctor_name,
+            a.appointment_date,
+            a.status
+        FROM appointment a
+        JOIN patient p ON p.patient_id = a.patient_id
+        JOIN doctor d ON d.doctor_id = a.doctor_id
+        ORDER BY a.appointment_date DESC
+        LIMIT 50
+        '''
+    )
+
+    appointments = cursor.fetchall()
+
+    cursor.close()
+    db.close()
+
+    return {'appointments': appointments}
+
+# ENDPOINT 6: Bills list
+# URL: http://127.0.0.1:8000/bills
+# Returns: recent bills with patient name and status
+@app.get('/bills')
+def get_bills():
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute(
+        '''
+        SELECT
+            b.bill_id,
+            p.full_name AS patient_name,
+            b.total_amount,
+            b.amount_paid,
+            b.status,
+            DATE_FORMAT(b.bill_date, '%d %b %Y') AS bill_date
+        FROM billing b
+        JOIN patient p ON p.patient_id = b.patient_id
+        ORDER BY b.created_at DESC
+        LIMIT 50
+        '''
+    )
+
+    bills = cursor.fetchall()
+
+    for bill in bills:
+        bill['total_amount'] = float(bill['total_amount'])
+        bill['amount_paid'] = float(bill['amount_paid'])
+
+    cursor.close()
+    db.close()
+
+    return {'bills': bills}
