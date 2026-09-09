@@ -1,26 +1,12 @@
--- Doctor appointment summary
-SELECT
-    d.full_name AS doctor_name,
-    COUNT(a.appointment_id) AS total_appointments
-FROM doctor AS d
-LEFT JOIN appointment AS a
-    ON d.doctor_id = a.doctor_id
-GROUP BY d.doctor_id, d.full_name
-ORDER BY total_appointments DESC;
+USE caresync;
 
-
--- Doctor appointment summary view
+-- Milestone 10: Doctor appointment summary
 CREATE OR REPLACE VIEW vw_doctor_appointment_summary AS
 SELECT
     d.full_name AS doctor_name,
     COUNT(a.appointment_id) AS total_appointments
-FROM doctor AS d
-LEFT JOIN appointment AS a
-    ON d.doctor_id = a.doctor_id
-GROUP BY d.doctor_id, d.full_name;
-
-
--- Verify view
-SELECT *
-FROM vw_doctor_appointment_summary
-LIMIT 10;
+FROM doctor d
+LEFT JOIN appointment a
+    ON a.doctor_id = d.doctor_id
+GROUP BY d.doctor_id, d.full_name
+ORDER BY total_appointments DESC;
