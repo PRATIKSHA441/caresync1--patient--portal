@@ -174,36 +174,22 @@ def get_patient_appointments(patient_id: int):
     db = get_db()
     cursor = db.cursor(dictionary=True)
 
-    cursor.execute(
-        '''
-        SELECT
-            a.appointment_id,
-            a.patient_id,
-            p.full_name AS patient_name,
-            a.doctor_id,
-            d.full_name AS doctor_name,
-            a.appointment_date,
-            a.status
-        FROM appointment a
-        JOIN patient p
+    query = '''
+        SELECT a.*
+        FROM appointment AS a
+        INNER JOIN patient AS p
             ON a.patient_id = p.patient_id
-        JOIN doctor d
-            ON a.doctor_id = d.doctor_id
-        WHERE a.patient_id = %s
-        ORDER BY a.appointment_date DESC
-        ''',
-        (patient_id,)
-    )
+        WHERE p.patient_id = %s
+    '''
+
+    cursor.execute(query, (patient_id,))
 
     appointments = cursor.fetchall()
 
     cursor.close()
     db.close()
 
-    return {
-        'patient_id': patient_id,
-        'appointments': appointments
-    }
+    return appointments
 
 
 # ─────────────────────────────────────────────────────────────
@@ -297,23 +283,24 @@ def get_doctor_analytics():
     db = get_db()
     cursor = db.cursor(dictionary=True)
 
-    cursor.execute(
-        '''
+    query = '''
         SELECT
             doctor_name,
-            appointment_count,
             total_appointments
         FROM vw_doctor_appointment_summary
         ORDER BY total_appointments DESC
-        '''
-    )
+    '''
 
-    doctors = cursor.fetchall()
+    cursor.execute(query)
+
+    analytics = cursor.fetchall()
 
     cursor.close()
     db.close()
 
-    return {'doctors': doctors}
+    return analytics
+
+    return analytics
 
 # ENDPOINT 5: Appointment list
 # URL: http://127.0.0.1:8000/appointments
