@@ -10,6 +10,9 @@
     <!-- Vue 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
 
         * {
@@ -112,6 +115,7 @@
             display: flex;
             gap: 8px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
 
         .tab-btn {
@@ -178,6 +182,38 @@
             opacity: 0.9;
         }
 
+        /* Billing Search */
+        .billing-search {
+            background: #ffffff;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+
+        .billing-search input {
+            padding: 10px;
+            width: 200px;
+            margin-right: 10px;
+            border: 1px solid #cccccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .billing-search button {
+            padding: 10px 20px;
+            background: #1f3864;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .billing-search button:hover {
+            opacity: 0.9;
+        }
+
         /* Patient result */
         .patient-result {
             margin-top: 15px;
@@ -196,6 +232,28 @@
         }
 
         .patient-not-found {
+            color: #c0392b;
+            font-weight: 600;
+        }
+
+        /* Billing result */
+        .billing-result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            background: #f5f5f5;
+        }
+
+        .billing-result h3 {
+            color: #1f3864;
+            margin-bottom: 10px;
+        }
+
+        .billing-result p {
+            margin: 6px 0;
+        }
+
+        .billing-not-found {
             color: #c0392b;
             font-weight: 600;
         }
@@ -264,6 +322,73 @@
         .badge-rejected {
             background: #f8d7da;
             color: #721c24;
+        }
+
+        /* Chart */
+        .chart-container {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            margin-bottom: 40px;
+            height: 500px;
+        }
+
+        /* Heatmap */
+        .heatmap-wrap {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            overflow-x: auto;
+            margin-bottom: 40px;
+        }
+
+        .heatmap-grid {
+            display: grid;
+            grid-template-columns: 90px repeat(7, minmax(70px, 1fr));
+            min-width: 650px;
+            gap: 2px;
+        }
+
+        .heatmap-cell {
+            min-height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .heatmap-header {
+            background: #f0f2f5;
+            color: #1f3864;
+        }
+
+        .heat-0 {
+            background: #f8f8f8;
+            color: #777;
+        }
+
+        .heat-1 {
+            background: #e4edf8;
+            color: #1f3864;
+        }
+
+        .heat-2 {
+            background: #c7d9ef;
+            color: #1f3864;
+        }
+
+        .heat-3 {
+            background: #8fb1d9;
+            color: #ffffff;
+        }
+
+        .heat-4 {
+            background: #4f79aa;
+            color: #ffffff;
         }
 
         /* Loading */
@@ -452,6 +577,42 @@
                         Doctors
                     </button>
 
+
+                    <button
+                        class="tab-btn"
+                        :class="{ active: activeTab === 'revenueTrend' }"
+                        @click="activeTab = 'revenueTrend'"
+                    >
+                        Revenue Trend
+                    </button>
+
+
+                    <button
+                        class="tab-btn"
+                        :class="{ active: activeTab === 'appointmentHeatmap' }"
+                        @click="activeTab = 'appointmentHeatmap'"
+                    >
+                        Appointment Heatmap
+                    </button>
+
+
+                    <button
+                        class="tab-btn"
+                        :class="{ active: activeTab === 'bloodGroup' }"
+                        @click="activeTab = 'bloodGroup'"
+                    >
+                        Blood Group Distribution
+                    </button>
+
+
+                    <button
+                        class="tab-btn"
+                        :class="{ active: activeTab === 'doctorSummary' }"
+                        @click="activeTab = 'doctorSummary'"
+                    >
+                        Doctor Summary
+                    </button>
+
                 </div>
 
 
@@ -471,7 +632,12 @@
                         </p>
 
 
+                        <label for="patientId">
+                            Enter Patient ID
+                        </label>
+
                         <input
+                            id="patientId"
                             type="number"
                             v-model="patientId"
                             placeholder="Enter Patient ID"
@@ -531,7 +697,7 @@
                             v-if="patientNotFound"
                             class="patient-result patient-not-found"
                         >
-                            Patient not found.
+                            Patient not found
                         </div>
 
                     </div>
@@ -654,6 +820,121 @@
 
                 <div v-if="activeTab === 'billing'">
 
+                    <!-- SEARCH BILL BY BILL ID -->
+
+                    <div class="billing-search">
+
+                        <p class="section-title">
+                            Search Billing by Bill ID
+                        </p>
+
+
+                        <label for="billId">
+                            Enter Bill ID
+                        </label>
+
+                        <input
+                            id="billId"
+                            type="number"
+                            v-model="billId"
+                            placeholder="Enter Bill ID"
+                            @keyup.enter="searchBill"
+                        />
+
+
+                        <button @click="searchBill">
+                            Search
+                        </button>
+
+
+                        <!-- Bill Found -->
+
+                        <div
+                            v-if="billingResult"
+                            class="billing-result"
+                        >
+
+                            <h3>
+                                Bill Details
+                            </h3>
+
+
+                            <p>
+                                <strong>
+                                    Bill ID:
+                                </strong>
+
+                                {{ billingResult.bill_id }}
+                            </p>
+
+
+                            <p>
+                                <strong>
+                                    Patient Name:
+                                </strong>
+
+                                {{ billingResult.patient_name }}
+                            </p>
+
+
+                            <p>
+                                <strong>
+                                    Total Amount:
+                                </strong>
+
+                                Rs {{ Number(billingResult.total_amount || 0).toFixed(2) }}
+                            </p>
+
+
+                            <p>
+                                <strong>
+                                    Amount Paid:
+                                </strong>
+
+                                Rs {{ Number(billingResult.amount_paid || 0).toFixed(2) }}
+                            </p>
+
+
+                            <p>
+                                <strong>
+                                    Status:
+                                </strong>
+
+                                <span
+                                    class="badge"
+                                    :class="badgeClass(billingResult.status)"
+                                >
+                                    {{ billingResult.status }}
+                                </span>
+
+                            </p>
+
+
+                            <p>
+                                <strong>
+                                    Bill Date:
+                                </strong>
+
+                                {{ billingResult.bill_date }}
+                            </p>
+
+                        </div>
+
+
+                        <!-- Bill Not Found -->
+
+                        <div
+                            v-if="billingNotFound"
+                            class="billing-result billing-not-found"
+                        >
+                            Bill not found
+                        </div>
+
+                    </div>
+
+
+                    <!-- ALL BILLING DATA -->
+
                     <div class="table-wrap">
 
                         <table>
@@ -707,11 +988,11 @@
                                     </td>
 
                                     <td>
-                                        Rs {{ b.total_amount.toFixed(2) }}
+                                        Rs {{ Number(b.total_amount || 0).toFixed(2) }}
                                     </td>
 
                                     <td>
-                                        Rs {{ b.amount_paid.toFixed(2) }}
+                                        Rs {{ Number(b.amount_paid || 0).toFixed(2) }}
                                     </td>
 
                                     <td>
@@ -810,6 +1091,121 @@
                 </div>
 
 
+
+                <!-- ============================= -->
+                <!-- REVENUE TREND TAB -->
+                <!-- ============================= -->
+
+                <div v-if="activeTab === 'revenueTrend'">
+
+                    <p class="section-title">
+                        Revenue Trend
+                    </p>
+
+                    <div class="chart-container">
+
+                        <canvas id="revenueTrendChart"></canvas>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- ============================= -->
+                <!-- APPOINTMENT HEATMAP TAB -->
+                <!-- ============================= -->
+
+                <div v-if="activeTab === 'appointmentHeatmap'">
+
+                    <p class="section-title">
+                        Appointment Heatmap
+                    </p>
+
+                    <div class="heatmap-wrap">
+
+                        <div class="heatmap-grid">
+
+                            <div class="heatmap-cell heatmap-header"></div>
+
+                            <div
+                                v-for="day in heatmapDays"
+                                :key="day"
+                                class="heatmap-cell heatmap-header"
+                            >
+                                {{ day }}
+                            </div>
+
+
+                            <template
+                                v-for="(row, rowIndex) in appointmentHeatmap"
+                                :key="row.month"
+                            >
+
+                                <div class="heatmap-cell heatmap-header">
+                                    {{ row.month }}
+                                </div>
+
+
+                                <div
+                                    v-for="(count, dayIndex) in row.values"
+                                    :key="`${rowIndex}-${dayIndex}`"
+                                    class="heatmap-cell"
+                                    :class="heatmapClass(count)"
+                                    :title="`${row.month} - ${heatmapDays[dayIndex]}: ${count} appointments`"
+                                >
+                                    {{ count }}
+                                </div>
+
+                            </template>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- ============================= -->
+                <!-- BLOOD GROUP DISTRIBUTION TAB -->
+                <!-- ============================= -->
+
+                <div v-if="activeTab === 'bloodGroup'">
+
+                    <p class="section-title">
+                        Blood Group Distribution
+                    </p>
+
+                    <div class="chart-container">
+
+                        <canvas id="bloodGroupChart"></canvas>
+
+                    </div>
+
+                </div>
+
+
+
+                <!-- ============================= -->
+                <!-- DOCTOR SUMMARY TAB -->
+                <!-- ============================= -->
+
+                <div v-if="activeTab === 'doctorSummary'">
+
+                    <p class="section-title">
+                        Doctor Summary
+                    </p>
+
+                    <div class="chart-container">
+
+                        <canvas id="doctorSummaryChart"></canvas>
+
+                    </div>
+
+                </div>
+
+
             </div>
 
         </div>
@@ -834,29 +1230,65 @@
                 return {
 
                     /* Loading and error */
+
                     loading: true,
                     error: false,
 
 
                     /* Active tab */
+
                     activeTab: 'patients',
 
 
                     /* Search by name */
+
                     patientSearch: '',
 
 
-                    /* Search by ID */
+                    /* Search by Patient ID */
+
                     patientId: '',
                     patientResult: null,
                     patientNotFound: false,
 
 
+                    /* Search by Bill ID */
+
+                    billId: '',
+                    billingResult: null,
+                    billingNotFound: false,
+
+
                     /* API data */
+
                     summary: {},
                     patients: [],
                     bills: [],
-                    doctors: []
+                    doctors: [],
+                    appointments: [],
+                    doctorAnalytics: [],
+
+
+                    /* Charts */
+
+                    doctorChart: null,
+                    revenueChart: null,
+                    bloodGroupChart: null,
+
+
+                    /* Appointment heatmap */
+
+                    heatmapDays: [
+                        'Sun',
+                        'Mon',
+                        'Tue',
+                        'Wed',
+                        'Thu',
+                        'Fri',
+                        'Sat'
+                    ],
+
+                    appointmentHeatmap: []
 
                 };
 
@@ -864,7 +1296,7 @@
 
 
             /* ============================= */
-            /* SEARCH BY NAME */
+            /* COMPUTED */
             /* ============================= */
 
             computed: {
@@ -886,11 +1318,48 @@
 
                     return this.patients.filter(p =>
 
-                        p.full_name
+                        String(p.full_name || '')
                             .toLowerCase()
                             .includes(term)
 
                     );
+
+                }
+
+            },
+
+
+            /* ============================= */
+            /* WATCHERS */
+            /* ============================= */
+
+            watch: {
+
+                activeTab(newTab) {
+
+                    this.$nextTick(() => {
+
+                        if (newTab === 'doctorSummary') {
+
+                            this.renderDoctorChart();
+
+                        }
+
+
+                        if (newTab === 'revenueTrend') {
+
+                            this.renderRevenueChart();
+
+                        }
+
+
+                        if (newTab === 'bloodGroup') {
+
+                            this.renderBloodGroupChart();
+
+                        }
+
+                    });
 
                 }
 
@@ -904,7 +1373,10 @@
             methods: {
 
 
-                /* Billing status */
+                /* ============================= */
+                /* BILLING STATUS */
+                /* ============================= */
+
                 badgeClass(status) {
 
                     const map = {
@@ -925,10 +1397,13 @@
                 },
 
 
-                /* Format numbers */
+                /* ============================= */
+                /* FORMAT NUMBERS */
+                /* ============================= */
+
                 formatNumber(n) {
 
-                    return Number(n)
+                    return Number(n || 0)
                         .toLocaleString('en-IN');
 
                 },
@@ -940,14 +1415,10 @@
 
                 async searchPatient() {
 
-                    /* Clear previous result */
-
                     this.patientResult = null;
 
                     this.patientNotFound = false;
 
-
-                    /* Check empty ID */
 
                     if (!this.patientId) {
 
@@ -965,8 +1436,6 @@
                         );
 
 
-                        /* 404 */
-
                         if (response.status === 404) {
 
                             this.patientNotFound = true;
@@ -976,8 +1445,6 @@
                         }
 
 
-                        /* Other errors */
-
                         if (!response.ok) {
 
                             throw new Error(
@@ -986,8 +1453,6 @@
 
                         }
 
-
-                        /* Convert response to JSON */
 
                         this.patientResult =
                             await response.json();
@@ -1010,6 +1475,635 @@
 
 
                 /* ============================= */
+                /* SEARCH BILL BY BILL ID */
+                /* ============================= */
+
+                searchBill() {
+
+                    this.billingResult = null;
+
+                    this.billingNotFound = false;
+
+
+                    if (!this.billId) {
+
+                        return;
+
+                    }
+
+
+                    const bill =
+                        this.bills.find(
+
+                            b =>
+                                Number(b.bill_id) ===
+                                Number(this.billId)
+
+                        );
+
+
+                    if (!bill) {
+
+                        this.billingNotFound = true;
+
+                        return;
+
+                    }
+
+
+                    this.billingResult = bill;
+
+                },
+
+
+                /* ============================= */
+                /* REVENUE TREND CHART */
+                /* ============================= */
+
+                renderRevenueChart() {
+
+                    const canvas =
+                        document.getElementById(
+                            'revenueTrendChart'
+                        );
+
+
+                    if (!canvas) {
+
+                        return;
+
+                    }
+
+
+                    if (this.revenueChart) {
+
+                        this.revenueChart.destroy();
+
+                    }
+
+
+                    const monthlyRevenue = {};
+
+
+                    this.bills.forEach(bill => {
+
+                        if (!bill.bill_date) {
+
+                            return;
+
+                        }
+
+
+                        const date =
+                            new Date(bill.bill_date);
+
+
+                        if (
+                            Number.isNaN(
+                                date.getTime()
+                            )
+                        ) {
+
+                            return;
+
+                        }
+
+
+                        const month =
+                            date.toLocaleDateString(
+                                'en-IN',
+                                {
+                                    month: 'short',
+                                    year: 'numeric'
+                                }
+                            );
+
+
+                        monthlyRevenue[month] =
+                            (
+                                monthlyRevenue[month] ||
+                                0
+                            ) +
+                            Number(
+                                bill.amount_paid || 0
+                            );
+
+                    });
+
+
+                    const entries =
+                        Object.entries(
+                            monthlyRevenue
+                        );
+
+
+                    this.revenueChart =
+                        new Chart(
+
+                            canvas,
+
+                            {
+
+                                type: 'line',
+
+
+                                data: {
+
+                                    labels:
+                                        entries.map(
+                                            ([month]) =>
+                                                month
+                                        ),
+
+
+                                    datasets: [
+
+                                        {
+
+                                            label:
+                                                'Revenue Collected',
+
+                                            data:
+                                                entries.map(
+                                                    ([, amount]) =>
+                                                        amount
+                                                ),
+
+                                            tension: 0.25
+
+                                        }
+
+                                    ]
+
+                                },
+
+
+                                options: {
+
+                                    responsive: true,
+
+                                    maintainAspectRatio:
+                                        false,
+
+
+                                    plugins: {
+
+                                        title: {
+
+                                            display: true,
+
+                                            text:
+                                                'Revenue Trend'
+
+                                        }
+
+                                    },
+
+
+                                    scales: {
+
+                                        y: {
+
+                                            beginAtZero:
+                                                true,
+
+                                            title: {
+
+                                                display: true,
+
+                                                text:
+                                                    'Revenue (Rs)'
+
+                                            }
+
+                                        }
+
+                                    }
+
+                                }
+
+                            }
+
+                        );
+
+                },
+
+
+                /* ============================= */
+                /* BLOOD GROUP CHART */
+                /* ============================= */
+
+                renderBloodGroupChart() {
+
+                    const canvas =
+                        document.getElementById(
+                            'bloodGroupChart'
+                        );
+
+
+                    if (!canvas) {
+
+                        return;
+
+                    }
+
+
+                    if (this.bloodGroupChart) {
+
+                        this.bloodGroupChart.destroy();
+
+                    }
+
+
+                    const counts = {};
+
+
+                    this.patients.forEach(
+                        patient => {
+
+                            const group =
+                                patient.blood_group ||
+                                'Unknown';
+
+
+                            counts[group] =
+                                (
+                                    counts[group] ||
+                                    0
+                                ) + 1;
+
+                        }
+                    );
+
+
+                    const entries =
+                        Object.entries(counts)
+                            .sort(
+                                (a, b) =>
+                                    b[1] - a[1]
+                            );
+
+
+                    this.bloodGroupChart =
+                        new Chart(
+
+                            canvas,
+
+                            {
+
+                                type: 'bar',
+
+
+                                data: {
+
+                                    labels:
+                                        entries.map(
+                                            ([group]) =>
+                                                group
+                                        ),
+
+
+                                    datasets: [
+
+                                        {
+
+                                            label:
+                                                'Patients',
+
+                                            data:
+                                                entries.map(
+                                                    ([, count]) =>
+                                                        count
+                                                )
+
+                                        }
+
+                                    ]
+
+                                },
+
+
+                                options: {
+
+                                    responsive: true,
+
+                                    maintainAspectRatio:
+                                        false,
+
+
+                                    plugins: {
+
+                                        title: {
+
+                                            display: true,
+
+                                            text:
+                                                'Blood Group Distribution'
+
+                                        }
+
+                                    },
+
+
+                                    scales: {
+
+                                        y: {
+
+                                            beginAtZero:
+                                                true,
+
+                                            ticks: {
+
+                                                precision: 0
+
+                                            }
+
+                                        }
+
+                                    }
+
+                                }
+
+                            }
+
+                        );
+
+                },
+
+
+                /* ============================= */
+                /* APPOINTMENT HEATMAP */
+                /* ============================= */
+
+                buildAppointmentHeatmap() {
+
+                    const monthMap = {};
+
+
+                    this.appointments.forEach(
+                        appointment => {
+
+                            if (
+                                !appointment.appointment_date
+                            ) {
+
+                                return;
+
+                            }
+
+
+                            const date =
+                                new Date(
+                                    appointment.appointment_date
+                                );
+
+
+                            if (
+                                Number.isNaN(
+                                    date.getTime()
+                                )
+                            ) {
+
+                                return;
+
+                            }
+
+
+                            const month =
+                                date.toLocaleDateString(
+                                    'en-IN',
+                                    {
+                                        month: 'short',
+                                        year: 'numeric'
+                                    }
+                                );
+
+
+                            if (!monthMap[month]) {
+
+                                monthMap[month] = [
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0
+                                ];
+
+                            }
+
+
+                            monthMap[month][
+                                date.getDay()
+                            ] += 1;
+
+                        }
+                    );
+
+
+                    this.appointmentHeatmap =
+                        Object.entries(monthMap)
+
+                            .sort(
+
+                                (a, b) =>
+
+                                    new Date(
+                                        `1 ${a[0]}`
+                                    ) -
+
+                                    new Date(
+                                        `1 ${b[0]}`
+                                    )
+
+                            )
+
+                            .map(
+                                ([month, values]) => ({
+
+                                    month,
+
+                                    values
+
+                                })
+                            );
+
+                },
+
+
+                heatmapClass(count) {
+
+                    if (count === 0) {
+
+                        return 'heat-0';
+
+                    }
+
+
+                    if (count <= 2) {
+
+                        return 'heat-1';
+
+                    }
+
+
+                    if (count <= 5) {
+
+                        return 'heat-2';
+
+                    }
+
+
+                    if (count <= 10) {
+
+                        return 'heat-3';
+
+                    }
+
+
+                    return 'heat-4';
+
+                },
+
+
+                /* ============================= */
+                /* DOCTOR SUMMARY CHART */
+                /* ============================= */
+
+                renderDoctorChart() {
+
+                    const canvas =
+                        document.getElementById(
+                            'doctorSummaryChart'
+                        );
+
+
+                    if (!canvas) {
+
+                        return;
+
+                    }
+
+
+                    if (this.doctorChart) {
+
+                        this.doctorChart.destroy();
+
+                    }
+
+
+                    const labels =
+                        this.doctorAnalytics.map(
+                            doctor =>
+                                doctor.doctor_name
+                        );
+
+
+                    const values =
+                        this.doctorAnalytics.map(
+                            doctor =>
+                                doctor.appointment_count
+                        );
+
+
+                    this.doctorChart =
+                        new Chart(
+
+                            canvas,
+
+                            {
+
+                                type: 'bar',
+
+
+                                data: {
+
+                                    labels: labels,
+
+
+                                    datasets: [
+
+                                        {
+
+                                            label:
+                                                'Total Appointment Count',
+
+                                            data:
+                                                values
+
+                                        }
+
+                                    ]
+
+                                },
+
+
+                                options: {
+
+                                    responsive: true,
+
+                                    maintainAspectRatio:
+                                        false,
+
+
+                                    plugins: {
+
+                                        title: {
+
+                                            display: true,
+
+                                            text:
+                                                'Appointments Per Doctor'
+
+                                        }
+
+                                    },
+
+
+                                    scales: {
+
+                                        x: {
+
+                                            title: {
+
+                                                display: true,
+
+                                                text:
+                                                    'Doctor Names'
+
+                                            }
+
+                                        },
+
+
+                                        y: {
+
+                                            beginAtZero: true,
+
+                                            title: {
+
+                                                display: true,
+
+                                                text:
+                                                    'Total Appointment Count'
+
+                                            }
+
+                                        }
+
+                                    }
+
+                                }
+
+                            }
+
+                        );
+
+                },
+
+
+                /* ============================= */
                 /* LOAD ALL DASHBOARD DATA */
                 /* ============================= */
 
@@ -1022,11 +2116,21 @@
 
 
                         const [
+
                             s,
+
                             p,
+
                             b,
-                            d
+
+                            d,
+
+                            a,
+
+                            analytics
+
                         ] = await Promise.all([
+
 
                             fetch(
                                 `${base}/summary`
@@ -1034,11 +2138,13 @@
                                 r => r.json()
                             ),
 
+
                             fetch(
                                 `${base}/patients`
                             ).then(
                                 r => r.json()
                             ),
+
 
                             fetch(
                                 `${base}/billing`
@@ -1046,8 +2152,23 @@
                                 r => r.json()
                             ),
 
+
                             fetch(
                                 `${base}/doctors`
+                            ).then(
+                                r => r.json()
+                            ),
+
+
+                            fetch(
+                                `${base}/appointments`
+                            ).then(
+                                r => r.json()
+                            ),
+
+
+                            fetch(
+                                `${base}/analytics/doctors`
                             ).then(
                                 r => r.json()
                             )
@@ -1059,16 +2180,69 @@
 
                         this.summary = s;
 
-                        this.patients = p.patients;
 
-                        this.bills = b.bills;
+                        this.patients =
+                            p.patients || [];
 
-                        this.doctors = d.doctors;
+
+                        this.bills =
+                            b.bills || [];
+
+
+                        this.doctors =
+                            d.doctors || [];
+
+
+                        this.appointments =
+                            a.appointments || [];
+
+
+                        this.doctorAnalytics =
+                            analytics.doctors || [];
+
+
+                        this.buildAppointmentHeatmap();
 
 
                         /* Stop loading */
 
                         this.loading = false;
+
+
+                        /* Render charts */
+
+                        this.$nextTick(() => {
+
+                            if (
+                                this.activeTab ===
+                                'doctorSummary'
+                            ) {
+
+                                this.renderDoctorChart();
+
+                            }
+
+
+                            if (
+                                this.activeTab ===
+                                'revenueTrend'
+                            ) {
+
+                                this.renderRevenueChart();
+
+                            }
+
+
+                            if (
+                                this.activeTab ===
+                                'bloodGroup'
+                            ) {
+
+                                this.renderBloodGroupChart();
+
+                            }
+
+                        });
 
                     }
 
@@ -1103,6 +2277,7 @@
             }
 
         })
+
 
         .mount('#app');
 
