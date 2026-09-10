@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CareSync Analytics Dashboard</title>
+
+    <!-- Vue 3: reactivity and component logic -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <!-- Chart.js: draws line charts, bar charts, and custom grids -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #1a1a1a; }
+
+        /* ── Navbar ───────────────────────────────────────── */
+        .navbar {
+            background: #1f3864; color: #fff;
+            padding: 16px 32px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .navbar h1 { font-size: 20px; font-weight: 600; }
+        .navbar span { font-size: 13px; opacity: 0.75; }
+
+        /* ── Page wrapper ────────────────────────────────── */
+        .page { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+
+        /* ── Tab buttons ─────────────────────────────────── */
+        .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+        .tab-btn {
+            padding: 9px 22px; border: 2px solid #1f3864;
+            background: #fff; color: #1f3864;
+            border-radius: 4px; cursor: pointer;
+            font-size: 14px; font-weight: 600;
+        }
+        .tab-btn.active { background: #1f3864; color: #fff; }
+
+        /* ── Section title ───────────────────────────────── */
+        .sec-title {
+            font-size: 17px; font-weight: 700; color: #1f3864;
+            margin-bottom: 6px;
+        }
+        .sec-sub { font-size: 13px; color: #555; margin-bottom: 20px; }
+
+        /* ── Card wrapper ────────────────────────────────── */
+        .card {
+            background: #fff; border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            padding: 24px; margin-bottom: 24px;
+        }
+
+        /* ── Chart canvas ────────────────────────────────── */
+        .chart-wrap { position: relative; height: 320px; width: 100%; }
+
+        /* ── Heatmap grid ────────────────────────────────── */
+        .heatmap { overflow-x: auto; }
+        .heatmap table { border-collapse: collapse; font-size: 12px; width: 100%; }
+        .heatmap th {
+            background: #1f3864; color: #fff;
+            padding: 7px 10px; text-align: center; white-space: nowrap;
+        }
+        .heatmap td {
+            padding: 6px 8px; text-align: center;
+            border: 1px solid #e8e8e8; min-width: 52px;
+            font-size: 12px; font-weight: 600;
+            transition: background 0.2s;
+        }
+        .heatmap td.row-label {
+            background: #f5f5f5; font-weight: 700;
+            color: #1f3864; text-align: left; padding-left: 10px;
+        }
+
+        /* ── Risk table ──────────────────────────────────── */
+        .risk-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+        .risk-table th {
+            background: #1f3864; color: #fff;
+            padding: 9px 12px; text-align: left;
+        }
+        .risk-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+        .risk-table tr:nth-child(even) td { background: #fafafa; }
+        .badge-rare {
+            display: inline-block; padding: 2px 10px;
+            background: #fde8e8; color: #922; border-radius: 12px;
+            font-size: 12px; font-weight: 700;
+        }
+
+        /* ── Summary stat pills ──────────────────────────── */
+        .pills { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+        .pill {
+            background: #fff; border-left: 4px solid #1f3864;
+            border-radius: 6px; padding: 14px 18px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.07); flex: 1; min-width: 140px;
+        }
+        .pill .plabel { font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 4px; }
+        .pill .pval   { font-size: 26px; font-weight: 700; color: #1f3864; }
+        .pill.red  { border-left-color: #c0392b; }
+        .pill.red .pval { color: #c0392b; }
+        .pill.green { border-left-color: #1a7a4a; }
+        .pill.green .pval { color: #1a7a4a; }
+
+        /* ── Loading / error ─────────────────────────────── */
+        .loading { text-align: center; padding: 60px; color: #888; font-size: 15px; }
+        .err     { text-align: center; padding: 40px; color: #c0392b; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <h1>CareSync Analytics Dashboard</h1>
+    <span>Advanced SQL  |  FastAPI  |  Vue.js  |  Chart.js</span>
+</div>
+
+<div id="app">
+  <div class="page">
+
+    <!-- Loading state -->
+    <div v-if="loading" class="loading">Loading analytics data from database...</div>
+
+    <!-- Error state -->
+    <div v-else-if="error" class="err">
+      Cannot reach the backend.<br/>
+      Make sure uvicorn is running:<br/>
+      <strong>uvicorn analytics_api:app --reload --port 8001</strong>
+    </div>
+
+    <!-- Main content -->
+    <div v-else>
+
+      <!-- Tab buttons -->
+      <div class="tabs">
+        <button class="tab-btn" :class="{active: tab==='revenue'}"   @click="switchTab('revenue')">
+          Revenue Trend
+        </button>
+        <button class="tab-btn" :class="{active: tab==='heatmap'}"   @click="switchTab('heatmap')">
+          Appointment Heatmap
+        </button>
+        <button class="tab-btn" :class="{active: tab==='bloodgroup'}" @click="switchTab('bloodgroup')">
+          Blood Group Report
+        </button>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <!-- TAB 1: Revenue Trend                               -->
+      <!-- ═══════════════════════════════════════════════════ -->
+      <div v-if="tab==='revenue'">
+        <p class="sec-title">Monthly Revenue Trend vs Rejection Rate</p>
+        <p class="sec-sub">
+          Last 12 months. Blue line = revenue collected (Rs). Red line = bill rejection rate (%).
+          A healthy hospital shows rising blue and falling red.
+        </p>
+
+        <!-- Summary pills -->
+        <div class="pills">
+          <div class="pill green">
+            <div class="plabel">Total Collected (12m)</div>
+            <div class="pval">Rs {{ totalCollected }}</div>
+          </div>
+          <div class="pill red">
+            <div class="plabel">Avg Rejection Rate</div>
+            <div class="pval">{{ avgRejection }}%</div>
+          </div>
+          <div class="pill">
+            <div class="plabel">Best Month (Revenue)</div>
+            <div class="pval">{{ bestMonth }}</div>
+          </div>
+          <div class="pill">
+            <div class="plabel">Total Bills Raised</div>
+            <div class="pval">{{ totalBills }}</div>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="card">
+          <div class="chart-wrap">
+            <canvas id="revenueChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <!-- TAB 2: Appointment Heatmap                         -->
+      <!-- ═══════════════════════════════════════════════════ -->
+      <div v-if="tab==='heatmap'">
+        <p class="sec-title">Appointment Volume Heatmap</p>
+        <p class="sec-sub">
+          Completed appointments per day of week, per month.
+          Darker cell = more appointments. Use this for staff scheduling decisions.
+        </p>
+        <div class="card">
+          <div class="heatmap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th v-for="d in dayLabels" :key="d">{{ d }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in heatmapRows" :key="row.month">
+                  <td class="row-label">{{ row.month }}</td>
+                  <td
+                    v-for="d in dayLabels" :key="d"
+                    :style="heatColor(row.days[d], heatmapMax)"
+                  >
+                    {{ row.days[d] || '' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════ -->
+      <!-- TAB 3: Blood Group Report                          -->
+      <!-- ═══════════════════════════════════════════════════ -->
+      <div v-if="tab==='bloodgroup'">
+        <p class="sec-title">Patient Blood Group Distribution</p>
+        <p class="sec-sub">
+          Total active patients by blood group. Rare blood groups (AB-, B-, A-, O-)
+          are flagged below with upcoming appointments in the next 30 days.
+        </p>
+
+        <!-- Chart -->
+        <div class="card">
+          <div class="chart-wrap">
+            <canvas id="bloodChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Risk flag table -->
+        <div class="card" v-if="bloodData.risk_patients && bloodData.risk_patients.length > 0">
+          <p style="font-weight:700; color:#922; margin-bottom:12px;">
+            Clinical Risk Flag: Rare Blood Group Patients with Upcoming Appointments
+          </p>
+          <p style="font-size:13px; color:#555; margin-bottom:14px;">
+            The pharmacy should ensure these rare blood types are stocked.
+          </p>
+          <table class="risk-table">
+            <thead>
+              <tr>
+                <th>Blood Group</th>
+                <th>Patient Name</th>
+                <th>Appointment Date</th>
+                <th>Doctor</th>
+                <th>Specialisation</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="rp in bloodData.risk_patients" :key="rp.patient_name + rp.appointment_date">
+                <td><span class="badge-rare">{{ rp.blood_group }}</span></td>
+                <td>{{ rp.patient_name }}</td>
+                <td>{{ rp.appointment_date }}</td>
+                <td>{{ rp.doctor_name }}</td>
+                <td>{{ rp.specialisation }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card" v-else>
+          <p style="color:#555; font-size:14px;">
+            No rare blood group patients have appointments in the next 30 days.
+          </p>
+        </div>
+      </div>
+
+    </div><!-- end v-else -->
+  </div><!-- end page -->
+</div><!-- end #app -->
+
+<script>
+const { createApp } = Vue;
+
+// Store chart instances so we can destroy and redraw when switching tabs.
+let revenueChartInstance = null;
+let bloodChartInstance   = null;
+
+createApp({
+  data() {
+    return {
+      loading:     true,
+      error:       false,
+      tab:         'revenue',
+
+      // Raw data from the three API endpoints
+      revenueData:  [],
+      heatmapData:  [],
+      bloodData:    {},
+    };
+  },
+
+  computed: {
+    // ── Revenue tab computed values ──────────────────────────────
+    totalCollected() {
+      const t = this.revenueData.reduce((s, r) => s + r.collected, 0);
+      return Math.round(t).toLocaleString('en-IN');
+    },
+    totalBills() {
+      return this.revenueData.reduce((s, r) => s + r.total_bills, 0).toLocaleString('en-IN');
+    },
+    avgRejection() {
+      if (!this.revenueData.length) return 0;
+      const avg = this.revenueData.reduce((s, r) => s + r.rejection_rate_pct, 0)
+                  / this.revenueData.length;
+      return avg.toFixed(1);
+    },
+    bestMonth() {
+      if (!this.revenueData.length) return '--';
+      return this.revenueData.reduce((a, b) => b.collected > a.collected ? b : a).month;
+    },
+
+    // ── Heatmap computed values ──────────────────────────────────
+    // Day labels in Mon-Fri-Sat-Sun order (DAYOFWEEK: 1=Sun...7=Sat)
+    dayLabels() {
+      return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    },
+    heatmapRows() {
+      // Build a map: month -> { dayName: count }
+      const map = {};
+      for (const r of this.heatmapData) {
+        if (!map[r.month]) map[r.month] = { month: r.month, days: {} };
+        map[r.month].days[r.day_name] = r.total;
+      }
+      return Object.values(map).sort((a, b) => a.month.localeCompare(b.month));
+    },
+    heatmapMax() {
+      return Math.max(...this.heatmapData.map(r => r.total), 1);
+    },
+  },
+
+  methods: {
+    // ── Heatmap cell background colour ──────────────────────────
+    // Interpolates from white (0) to deep navy (max)
+    heatColor(val, max) {
+      if (!val) return { background: '#f8f8f8', color: '#ccc' };
+      const intensity = val / max;
+      // Interpolate: white (#fff) to deep blue (#1f3864)
+      const r = Math.round(255 - intensity * (255 - 31));
+      const g = Math.round(255 - intensity * (255 - 56));
+      const b = Math.round(255 - intensity * (255 - 100));
+      const textColor = intensity > 0.5 ? '#ffffff' : '#1a1a1a';
+      return { background: `rgb(${r},${g},${b})`, color: textColor };
+    },
+
+    // ── Draw the revenue line chart ──────────────────────────────
+    drawRevenueChart() {
+      const el = document.getElementById('revenueChart');
+      if (!el) return;
+      if (revenueChartInstance) { revenueChartInstance.destroy(); }
+
+      const labels   = this.revenueData.map(r => r.month);
+      const revenue  = this.revenueData.map(r => r.collected);
+      const rejected = this.revenueData.map(r => r.rejection_rate_pct);
+
+      revenueChartInstance = new Chart(el, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Revenue Collected (Rs)',
+              data: revenue,
+              borderColor: '#1a7a4a',
+              backgroundColor: 'rgba(26,122,74,0.08)',
+              borderWidth: 2.5,
+              fill: true,
+              tension: 0.3,
+              pointRadius: 4,
+              yAxisID: 'yRevenue',
+            },
+            {
+              label: 'Rejection Rate (%)',
+              data: rejected,
+              borderColor: '#c0392b',
+              backgroundColor: 'rgba(192,57,43,0.06)',
+              borderWidth: 2,
+              fill: false,
+              tension: 0.3,
+              pointRadius: 4,
+              borderDash: [5, 3],
+              yAxisID: 'yRate',
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: { callbacks: {
+              label(ctx) {
+                if (ctx.datasetIndex === 0)
+                  return ' Rs ' + ctx.parsed.y.toLocaleString('en-IN');
+                return ' ' + ctx.parsed.y + '%';
+              }
+            }},
+          },
+          scales: {
+            yRevenue: {
+              type: 'linear', position: 'left',
+              title: { display: true, text: 'Revenue Collected (Rs)' },
+              ticks: { callback: v => 'Rs ' + v.toLocaleString('en-IN') },
+            },
+            yRate: {
+              type: 'linear', position: 'right',
+              title: { display: true, text: 'Rejection Rate (%)' },
+              grid: { drawOnChartArea: false },
+              min: 0, max: 25,
+            },
+          },
+        },
+      });
+    },
+
+    // ── Draw the blood group bar chart ───────────────────────────
+    drawBloodChart() {
+      const el = document.getElementById('bloodChart');
+      if (!el) return;
+      if (bloodChartInstance) { bloodChartInstance.destroy(); }
+
+      const dist   = this.bloodData.distribution || [];
+      const labels = dist.map(r => r.blood_group);
+      const counts = dist.map(r => r.patient_count);
+
+      // Rare groups get a red bar, common groups get navy
+      const rareGroups = ['AB-', 'B-', 'A-', 'O-'];
+      const colors = labels.map(l =>
+        rareGroups.includes(l) ? 'rgba(192,57,43,0.85)' : 'rgba(31,56,100,0.80)'
+      );
+
+      bloodChartInstance = new Chart(el, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Number of Patients',
+            data: counts,
+            backgroundColor: colors,
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              label(ctx) { return ' ' + ctx.parsed.y + ' patients'; }
+            }},
+          },
+          scales: {
+            y: { title: { display: true, text: 'Patient Count' }, beginAtZero: true },
+            x: { title: { display: true, text: 'Blood Group (red bars = rare)' } },
+          },
+        },
+      });
+    },
+
+    // ── Switch tabs and draw the correct chart ───────────────────
+    // nextTick waits for Vue to update the DOM before Chart.js runs.
+    // Without this, the canvas element does not exist yet when we try to draw.
+    switchTab(name) {
+      this.tab = name;
+      this.$nextTick(() => {
+        if (name === 'revenue')    this.drawRevenueChart();
+        if (name === 'bloodgroup') this.drawBloodChart();
+      });
+    },
+
+    // ── Fetch all three endpoints at page load ───────────────────
+    async fetchAll() {
+      try {
+        const base = 'http://127.0.0.1:8001';
+        const [r, h, b] = await Promise.all([
+          fetch(`${base}/revenue-trend`).then(x => x.json()),
+          fetch(`${base}/appointment-heatmap`).then(x => x.json()),
+          fetch(`${base}/blood-groups`).then(x => x.json()),
+        ]);
+        this.revenueData = r.data;
+        this.heatmapData = h.data;
+        this.bloodData   = b;
+        this.loading     = false;
+
+        // Draw the first chart after Vue renders the canvas
+        this.$nextTick(() => this.drawRevenueChart());
+      } catch (e) {
+        console.error(e);
+        this.loading = false;
+        this.error   = true;
+      }
+    },
+  },
+
+  mounted() {
+    // Runs automatically when the page loads
+    this.fetchAll();
+  },
+
+}).mount('#app');
+</script>
+</body>
+</html>
+
